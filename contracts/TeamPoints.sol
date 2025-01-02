@@ -3,42 +3,78 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./Organization.sol";
 
 contract TeamPoints is ERC20, Ownable {
-    Organization public organization;
-    mapping(address => uint256) private firstReceiptTime;
+    bool public isTransferable;
+    bool public isOutsideTransferAllowed;
+    uint256 public materialContributionWeight;
+    mapping(address => bool) private hasReceivedTokens;
+    mapping(address => uint256) private firstMintTime;
 
-    constructor(address _organization, address initialOwner) 
+    event SettingsUpdated(bool isTransferable, bool isOutsideTransferAllowed, uint256 materialWeight);
+
+    constructor(
+        address initialOwner,
+        bool _isTransferable,
+        bool _isOutsideTransferAllowed,
+        uint256 _materialWeight
+    ) 
         ERC20("Team Points", "TPNT") 
         Ownable(initialOwner) 
     {
-        organization = Organization(_organization);
+        isTransferable = _isTransferable;
+        isOutsideTransferAllowed = _isOutsideTransferAllowed;
+        materialContributionWeight = _materialWeight;
+    }
+
+    function getTimeWeight(address user) public view returns (uint256) {
+        if (firstMintTime[user] == 0) return 2000;
+        
+        uint256 sixMonthPeriods = (block.timestamp - firstMintTime[user]) / (180 days);
+        uint256 timeWeight = 2000 + (sixMonthPeriods * 125); 
+        
+        return timeWeight > 4000 ? 4000 : timeWeight;
     }
 
     function _update(address from, address to, uint256 value) internal override {
-        if (from != address(0) && firstReceiptTime[from] == 0) {
-            firstReceiptTime[from] = block.timestamp;
-        }
-
-        if (from != address(0)) { // Skip check for minting
-            require(block.timestamp >= firstReceiptTime[from] + 365 days, "Token transfers are locked for the first year");
-        }
+        require(isTransferable || from == address(0), "Transfers are disabled");
         
-        require(organization.isMember(to), "Recipient is not a member of the organization");
+        if (!isOutsideTransferAllowed && from != address(0)) {
+            require(hasReceivedTokens[to], "Recipient must be an existing token holder");
+        }
 
         super._update(from, to, value);
     }
 
-    function mint(address to, uint256 amount) external onlyOwner {
-        require(organization.isMember(to), "Recipient is not a member of the organization");
-        _mint(to, amount);
-        if (firstReceiptTime[to] == 0) {
-            firstReceiptTime[to] = block.timestamp;
+    function mint(
+        address to,
+        uint256 monetaryAmount,
+        uint256 timeAmount
+    ) external onlyOwner {
+        if (firstMintTime[to] == 0) {
+            firstMintTime[to] = block.timestamp;
+        }
+
+        uint256 timeWeight = getTimeWeight(to);
+        uint256 totalAmount = (monetaryAmount * materialContributionWeight) + 
+                            (timeAmount * timeWeight) / 1000;
+        
+        _mint(to, totalAmount);
+        
+        if (!hasReceivedTokens[to]) {
+            hasReceivedTokens[to] = true;
         }
     }
 
-    function getFirstReceiptTime(address account) external view returns (uint256) {
-        return firstReceiptTime[account];
+    function updateSettings(
+        bool _isTransferable,
+        bool _isOutsideTransferAllowed,
+        uint256 _materialWeight
+    ) external onlyOwner {
+        isTransferable = _isTransferable;
+        isOutsideTransferAllowed = _isOutsideTransferAllowed;
+        materialContributionWeight = _materialWeight;
+        
+        emit SettingsUpdated(_isTransferable, _isOutsideTransferAllowed, _materialWeight);
     }
 }
