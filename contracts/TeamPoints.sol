@@ -2,16 +2,21 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract TeamPoints is ERC20, Ownable {
+contract TeamPoints is ERC20 {
     bool public isTransferable;
     bool public isOutsideTransferAllowed;
     uint256 public materialContributionWeight;
     mapping(address => bool) private hasReceivedTokens;
     mapping(address => uint256) private firstMintTime;
+    mapping(address => bool) public isAdmin;
 
     event SettingsUpdated(bool isTransferable, bool isOutsideTransferAllowed, uint256 materialWeight);
+
+    modifier onlyAdmin() {
+        require(isAdmin[msg.sender], "Only admins can call this function");
+        _;
+    }
 
     constructor(
         address initialOwner,
@@ -20,8 +25,8 @@ contract TeamPoints is ERC20, Ownable {
         uint256 _materialWeight
     ) 
         ERC20("Team Points", "TPNT") 
-        Ownable(initialOwner) 
     {
+        isAdmin[initialOwner] = true;
         isTransferable = _isTransferable;
         isOutsideTransferAllowed = _isOutsideTransferAllowed;
         materialContributionWeight = _materialWeight;
@@ -50,7 +55,7 @@ contract TeamPoints is ERC20, Ownable {
         address to,
         uint256 monetaryAmount,
         uint256 timeAmount
-    ) external onlyOwner {
+    ) external onlyAdmin {
         if (firstMintTime[to] == 0) {
             firstMintTime[to] = block.timestamp;
         }
@@ -70,7 +75,7 @@ contract TeamPoints is ERC20, Ownable {
         bool _isTransferable,
         bool _isOutsideTransferAllowed,
         uint256 _materialWeight
-    ) external onlyOwner {
+    ) external onlyAdmin {
         isTransferable = _isTransferable;
         isOutsideTransferAllowed = _isOutsideTransferAllowed;
         materialContributionWeight = _materialWeight;
