@@ -21,17 +21,11 @@ contract TeamPointsFactory {
 
     /**
      * @notice Deploys a new TeamPoints contract, setting msg.sender as the initial admin.
-     * @param isTransferable Whether tokens in the new contract can be transferred.
-     * @param isOutsideTransferAllowed Whether tokens can be transferred to addresses that haven't received tokens before.
-     * @param materialWeight The multiplier for material contributions in the minting calculation.
      * @param name The ERC20 name for the new TeamPoints token.
      * @param symbol The ERC20 symbol for the new TeamPoints token.
      * @return contractAddress The address of the newly deployed TeamPoints contract.
      */
-    function createTeamPoints(
-        bool isTransferable,
-        bool isOutsideTransferAllowed,
-        uint256 materialWeight,
+    function deployTeamPoints(
         string memory name,
         string memory symbol
     )
@@ -41,9 +35,9 @@ contract TeamPointsFactory {
         // Deploy a new TeamPoints contract
         TeamPoints newTeamPoints = new TeamPoints(
             msg.sender,                
-            isTransferable,
-            isOutsideTransferAllowed,
-            materialWeight,
+            false,
+            false,
+            4000,
             name,
             symbol
         );

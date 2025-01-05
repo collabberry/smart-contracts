@@ -383,7 +383,7 @@ npx hardhat test
 ## Deployed Contracts
 
 - **Network**: Arbitrum Sepolia
-- **TeamPointsFactory** deployed to: `0x5FbDB2315678afecb367f032d93F642f64180aa3`
+- **TeamPointsFactory** deployed to: `0x0e414560fdEeC039c4636b9392176ddc938b182D`
 
 ---
 

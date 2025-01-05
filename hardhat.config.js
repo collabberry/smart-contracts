@@ -9,7 +9,8 @@ module.exports = {
   networks: {
     hardhat: {},
     arbitrum: {
-      url:`https://arbitrum-sepolia.blockpi.network/v1/rpc/public`,
+      url:`https://arbitrum-sepolia-rpc.publicnode.com`,
+      chainId: 421614,
       accounts: [process.env.DEV_PK]
     }
   },

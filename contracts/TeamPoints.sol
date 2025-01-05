@@ -97,9 +97,8 @@ contract TeamPoints is ERC20, AccessControl {
         }
 
         uint256 timeWeight = getTimeWeight(to);
-        uint256 totalAmount = (materialContribution *
-            materialContributionWeight) +
-            ((timeContribution * timeWeight) / 1000);
+        uint256 totalAmount = ((materialContribution * materialContributionWeight) /
+            1000) + ((timeContribution * timeWeight) / 1000);
 
         _mint(to, totalAmount);
 
@@ -128,8 +127,8 @@ contract TeamPoints is ERC20, AccessControl {
             uint256 timeWeight = getTimeWeight(recipients[i]);
 
             // Same mint calculation as in your existing mint function
-            uint256 totalAmount = (materialContributions[i] *
-                materialContributionWeight) +
+            uint256 totalAmount = ((materialContributions[i] *
+                materialContributionWeight) / 1000) +
                 ((timeContributions[i] * timeWeight) / 1000);
 
             _mint(recipients[i], totalAmount);

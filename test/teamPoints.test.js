@@ -18,10 +18,7 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
   describe("TeamPointsFactory", function () {
     it("Should deploy a new TeamPoints contract and set msg.sender as the initial owner", async function () {
       // 2. Create a new TeamPoints through the factory
-      const tx = await teamPointsFactory.createTeamPoints(
-        true,          // isTransferable
-        false,         // isOutsideTransferAllowed
-        100,           // materialContributionWeight
+      const tx = await teamPointsFactory.deployTeamPoints(
         "My Token",    // name
         "MTK"          // symbol
       );
@@ -48,24 +45,18 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
 
       expect(name).to.equal("My Token");
       expect(symbol).to.equal("MTK");
-      expect(isTransferable).to.equal(true);
+      expect(isTransferable).to.equal(false);
       expect(isOutsideTransferAllowed).to.equal(false);
-      expect(materialWeight).to.equal(100);
+      expect(materialWeight).to.equal(4000);
     });
 
     it("Should track all deployed TeamPoints addresses", async function () {
       // Deploy two separate TeamPoints instances
-      await teamPointsFactory.createTeamPoints(
-        false,
-        false,
-        200,
+      await teamPointsFactory.deployTeamPoints(
         "TokenA",
         "TKA"
       );
-      await teamPointsFactory.createTeamPoints(
-        true,
-        true,
-        300,
+      await teamPointsFactory.deployTeamPoints(
         "TokenB",
         "TKB"
       );
@@ -84,10 +75,7 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
   describe("TeamPoints (from a newly deployed instance)", function () {
     beforeEach(async function () {
       // Deploy a single TeamPoints instance via factory
-      const tx = await teamPointsFactory.createTeamPoints(
-        false, // isTransferable (initially false)
-        false, // isOutsideTransferAllowed
-        100, // materialContributionWeight
+      const tx = await teamPointsFactory.deployTeamPoints(
         "Test Token",
         "TTK"
       );
@@ -106,7 +94,8 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
       await teamPoints.mint(addr1.address, 200, 100);
 
       const balanceAddr1 = await teamPoints.balanceOf(addr1.address);
-      expect(balanceAddr1).to.be.gt(0);
+      // Balance to be: 200 * 4 + 100 * 2 = 800 + 200 = 1000
+      expect(balanceAddr1).to.eq(1000);
 
       // 3. Non-admin tries to mint
       await expect(
@@ -157,7 +146,7 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
 
     it("Should prevent transfers to new addresses if isOutsideTransferAllowed is false", async function () {
       // isTransferable = false by default, so let's allow transfers
-      await teamPoints.updateSettings(true, false, 4);
+      await teamPoints.updateSettings(true, false, 4000);
 
       // Mint some tokens to addr1
       // minted = 0 + (100 * 2000 / 1000) = 200
@@ -184,7 +173,7 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
       // Default settings from constructor
       expect(await teamPoints.isTransferable()).to.equal(false);
       expect(await teamPoints.isOutsideTransferAllowed()).to.equal(false);
-      expect(await teamPoints.materialContributionWeight()).to.equal(100);
+      expect(await teamPoints.materialContributionWeight()).to.equal(4000);
 
       // Update
       await teamPoints.updateSettings(true, true, 500);
@@ -221,12 +210,15 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
 
     describe("Material & Time Contribution Calculations", function () {
       it("Should mint the correct amount with zero time contribution (timeWeight = 2000 by default)", async function () {
-        // materialContributionWeight = 100, from the constructor
+
+        // set materialContributionWeight = 10
+        await teamPoints.updateSettings(true, true, 100000);
+
         // For a new user, timeWeight = 2000
         // minted = (materialContribution * 100) + (timeContribution * 2000 / 1000)
 
         // Example: mint(addr1, 10, 0)
-        // minted = (10 * 100) + (0 * 2000/1000) = 1000
+        // minted = (10 * 10000/1000) + (0 * 2000/1000) = 1000
         await teamPoints.mint(addr1.address, 10, 0);
         expect(await teamPoints.balanceOf(addr1.address)).to.equal(1000);
       });
@@ -234,11 +226,15 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
       it("Should mint the correct amount with both material and time contributions for a new user", async function () {
         // Example: mint(addr1, 10, 50) => new user => timeWeight=2000
         // minted = (10 * 100) + ((50 * 2000) / 1000) = 1000 + 100 = 1100
+        await teamPoints.updateSettings(true, true, 100000);
+
         await teamPoints.mint(addr1.address, 10, 50);
         expect(await teamPoints.balanceOf(addr1.address)).to.equal(1100);
       });
 
       it("Should increase timeWeight after 6 months and mint accordingly", async function () {
+        await teamPoints.updateSettings(true, true, 100000);
+
         // 1) Mint initially to set firstMintTime
         // minted = (0 * 100) + ((50 * 2000) / 1000) = 100
         await teamPoints.mint(addr1.address, 0, 50);
@@ -260,6 +256,8 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
       });
 
       it("Should cap timeWeight at 4000 after enough time passes", async function () {
+        await teamPoints.updateSettings(true, true, 100000);
+
         // For the first mint
         await teamPoints.mint(addr1.address, 1, 0);
         // minted = (1*100) + 0 = 100
@@ -301,13 +299,11 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
         await teamPointsFactory.deployed();
 
         // Create a new TeamPoints instance via the factory
-        const tx = await teamPointsFactory.createTeamPoints(
-          false, // isTransferable
-          false, // isOutsideTransferAllowed
-          100,   // materialContributionWeight
+        const tx = await teamPointsFactory.deployTeamPoints(
           "Batch Test Token",
           "BTT"
         );
+
         const receipt = await tx.wait();
         const event = receipt.events.find((e) => e.event === "TeamPointsCreated");
         const contractAddress = event.args.contractAddress;
@@ -315,6 +311,8 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
         // Attach to the newly created contract
         const TeamPoints = await ethers.getContractFactory("TeamPoints");
         teamPoints = await TeamPoints.attach(contractAddress);
+        await teamPoints.updateSettings(true, true, 100000);
+
       });
 
       describe("batchMint()", function () {
