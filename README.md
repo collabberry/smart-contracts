@@ -1,8 +1,8 @@
 # Collabberry Smart Contracts
 
-This repository contains two main smart contracts: 
+This repository contains two main smart contracts:
 
-1. **TeamPoints** – A specialized ERC20 token that incorporates custom minting logic, transfer restrictions, and role-based access control.  
+1. **TeamPoints** – A specialized ERC20 token that incorporates custom minting logic, transfer restrictions, and role-based access control.
 2. **TeamPointsFactory** – A factory contract that deploys new instances of the **TeamPoints** contract.
 
 Below you will find a detailed breakdown of how they work, their functions, and how you might interact with them.
@@ -17,12 +17,14 @@ Below you will find a detailed breakdown of how they work, their functions, and 
    - [Roles & Access Control](#roles--access-control)
    - [State Variables](#state-variables)
    - [Functions](#functions)
+   - [Batch Mint](#batch-mint)
 3. [TeamPointsFactory](#teampointsfactory)
    - [Factory Logic](#factory-logic)
    - [Functions](#factory-functions)
 4. [Usage & Examples](#usage--examples)
 5. [Testing](#testing)
-6. [License](#license)
+6. [Deployed Contracts](#deployed-contracts)
+7. [License](#license)
 
 ---
 
@@ -71,25 +73,26 @@ The **TeamPointsFactory** simplifies deploying new **TeamPoints** contracts by p
 
 ### Roles & Access Control
 
-- **ADMIN_ROLE** (bytes32 `keccak256("ADMIN_ROLE")`)  
+- **ADMIN_ROLE** (`bytes32` = `keccak256("ADMIN_ROLE")`)  
   Allows the holder to:
-  - Mint new tokens via `mint`.
+  - Mint new tokens via `mint` 
+  - Batch mint tokens via `batchMint`
   - Update critical settings via `updateSettings`.
   - Add or remove admins.
-  
-The contract also ensures there is never a scenario where the last admin is removed (which would render the contract locked).  
+
+The contract also ensures there is never a scenario where the last admin is removed (which would lock the contract).
 
 ### State Variables
 
 - `bool public isTransferable`  
   Determines whether token transfers (beyond minting) are allowed.
-  
+
 - `bool public isOutsideTransferAllowed`  
   If `true`, tokens may be transferred to any address. If `false`, tokens can only be transferred to addresses that already hold tokens.
-  
+
 - `uint256 public materialContributionWeight`  
   The multiplier applied to the `materialContribution` when minting new tokens.
-  
+
 - `uint256 private adminCount`  
   Tracks the number of current admins to prevent removing the last admin.
 
@@ -115,6 +118,7 @@ constructor(
 ```
 
 - **Parameters**:
+
   - `initialOwner`: Address to receive the `ADMIN_ROLE`.
   - `_isTransferable`: Initial setting for enabling or disabling transfers.
   - `_isOutsideTransferAllowed`: Initial setting for allowing or disallowing transfers to addresses that do not yet hold tokens.
@@ -132,23 +136,24 @@ constructor(
 Calculates the time-based multiplier for a given user.  
 
 - **Logic**:
-  1. If `firstMintTime[user] == 0`, returns `2000` (default).
-  2. Otherwise, calculates how many 6-month periods have elapsed since `firstMintTime[user]`.
-  3. Increases the weight by `125` for each 6-month period.
-  4. Caps the final value at `4000`.
+1. If `firstMintTime[user] == 0`, returns `2000` (default).
+2. Otherwise, calculates how many 6-month periods have elapsed since `firstMintTime[user]`.
+3. Increases the weight by `125` for each 6-month period.
+4. Caps the final value at `4000`.
 
 #### `_update(address from, address to, uint256 value) internal override`
 
 Overrides ERC20’s transfer mechanism to enforce the contract’s rules:
 
-- If transfers are disabled (`isTransferable == false`), only allow minting transfers (i.e., `from == address(0)`).
+- If transfers are disabled (`isTransferable == false`), only allow “mint” transfers (`from == address(0)`).
 - If outside transfers are not allowed (`isOutsideTransferAllowed == false`), ensure `to` has received tokens before.
 
-Calls `super._update(from, to, value)` to finalize the standard ERC20 transfer logic once checks pass.
+After these checks, calls `super._update(from, to, value)` to finalize the standard ERC20 transfer logic.
 
 #### `mint(address to, uint256 materialContribution, uint256 timeContribution) external onlyRole(ADMIN_ROLE)`
 
-Mints new tokens to a specified address. The calculation is:
+Mints new tokens to a specified address.  
+Calculation:
 
 ```solidity
 uint256 timeWeight = getTimeWeight(to);
@@ -157,35 +162,22 @@ uint256 totalAmount = (materialContribution * materialContributionWeight)
 _mint(to, totalAmount);
 ```
 
-- **Important**: If `firstMintTime[to]` is `0`, it is set to the current block timestamp to start time-based calculations.
-- **Access**: Only callable by an address with `ADMIN_ROLE`.
+- If `firstMintTime[to]` is `0`, it is set to the current block timestamp.
+- Requires `ADMIN_ROLE`.
 
 #### `updateSettings(bool _isTransferable, bool _isOutsideTransferAllowed, uint256 _materialWeight) external onlyRole(ADMIN_ROLE)`
 
-Updates the contract’s transfer-related settings and the `materialContributionWeight`.
-
-- **Parameters**:
-  - `_isTransferable`: Enable or disable transfers.
-  - `_isOutsideTransferAllowed`: If false, transfers can only go to existing token holders.
-  - `_materialWeight`: New multiplier for material contributions.
+Updates the contract’s transfer-related settings (`isTransferable`, `isOutsideTransferAllowed`) and the `materialContributionWeight`.
 
 #### `addAdmin(address newAdmin) external onlyRole(ADMIN_ROLE)`
 
-Grants `ADMIN_ROLE` to a new address, provided:
-
-1. The address is already a token holder.
-2. The address does not already have `ADMIN_ROLE`.
-
-Increments `adminCount` and emits an `AdminAdded` event.
+Grants `ADMIN_ROLE` to a new address, provided it already holds some tokens and does not already have `ADMIN_ROLE`.  
+Emits an `AdminAdded` event, increments `adminCount`.
 
 #### `removeAdmin(address toRemove) external onlyRole(ADMIN_ROLE)`
 
-Revokes `ADMIN_ROLE` from `toRemove`, with two checks:
-
-1. The address has `ADMIN_ROLE`.
-2. `adminCount` is greater than 1 (to avoid removing the last admin).
-
-Emits an `AdminRemoved` event.
+Revokes `ADMIN_ROLE` from `toRemove`, provided it currently has `ADMIN_ROLE` and there’s more than one admin remaining.  
+Emits an `AdminRemoved` event, decrements `adminCount`.
 
 #### `isAdmin(address account) public view returns (bool)`
 
@@ -193,15 +185,65 @@ Convenience function to check whether a given address has `ADMIN_ROLE`.
 
 ---
 
+### Batch Mint
+
+If you need to mint to multiple recipients in a single transaction, you can add a `batchMint()` function to your contract. By default, **TeamPoints** does not include this feature, but you can add something like the following:
+
+```solidity
+function batchMint(
+    address[] calldata recipients,
+    uint256[] calldata materialContributions,
+    uint256[] calldata timeContributions
+) external onlyRole(ADMIN_ROLE) {
+    require(
+        recipients.length == materialContributions.length &&
+        recipients.length == timeContributions.length,
+        "Input array lengths mismatch"
+    );
+
+    for (uint256 i = 0; i < recipients.length; i++) {
+        if (firstMintTime[recipients[i]] == 0) {
+            firstMintTime[recipients[i]] = block.timestamp;
+        }
+
+        uint256 timeWeight = getTimeWeight(recipients[i]);
+        uint256 totalAmount =
+            (materialContributions[i] * materialContributionWeight) +
+            ((timeContributions[i] * timeWeight) / 1000);
+
+        _mint(recipients[i], totalAmount);
+
+        if (!hasReceivedTokens[recipients[i]]) {
+            hasReceivedTokens[recipients[i]] = true;
+        }
+    }
+}
+```
+
+- **Usage**:
+  ```js
+  // Example (JS / ethers.js):
+  await teamPoints.batchMint(
+    [user1, user2],
+    [100, 200], // material
+    [50, 80] // time
+  );
+  ```
+- **Benefits**:
+  - All mints occur in a single transaction (atomic).
+  - Gas is consolidated into one transaction rather than many.
+
+---
+
 ## TeamPointsFactory
 
 ### Factory Logic
 
-The **TeamPointsFactory** contract allows anyone to create a new instance of the **TeamPoints** contract using a single function call. It:
+**TeamPointsFactory** helps you deploy new **TeamPoints** contracts quickly:
 
-- Deploys the new instance, passing the desired initial settings (e.g., name, symbol, whether tokens are transferable, etc.).
-- Automatically sets the caller as the initial admin on the newly deployed **TeamPoints**.
-- Stores the addresses of all deployed **TeamPoints** instances in an array for on-chain reference.
+- Deploys a new **TeamPoints** instance with desired initial settings.
+- Grants the deployer `ADMIN_ROLE` on the new contract.
+- Keeps an on-chain record of all deployed contracts.
 
 ### Factory Functions
 
@@ -218,38 +260,39 @@ function createTeamPoints(
 ```
 
 - **Parameters**:
+
   - `isTransferable`: Whether tokens in the new contract can be transferred.
-  - `isOutsideTransferAllowed`: Whether transfers to non-holding addresses are allowed.
+  - `isOutsideTransferAllowed`: Whether transfers to addresses that haven’t previously held tokens are allowed.
   - `materialWeight`: Initial multiplier for material contributions.
   - `name`: ERC20 name for the new tokens.
   - `symbol`: ERC20 symbol for the new tokens.
 
 - **Effects**:
-  - Deploys a new `TeamPoints` contract with the above parameters.
-  - Grants the factory caller the `ADMIN_ROLE` on the newly deployed instance.
-  - Emits a `TeamPointsCreated` event with the new contract address.
+  - Deploys a new **TeamPoints** instance.
+  - Sets `msg.sender` as the initial admin of the new contract.
+  - Emits a `TeamPointsCreated` event.
 
 #### `getTeamPointsCount() -> uint256`
 
-Returns the total number of **TeamPoints** contracts deployed by this factory.
+Returns the total number of **TeamPoints** contracts deployed.
 
 #### `getAllTeamPoints() -> address[]`
 
-Returns an array of all **TeamPoints** contract addresses that were created by this factory.
+Returns an array of all deployed **TeamPoints** contract addresses.
 
 ---
 
 ## Usage & Examples
 
-Below is a high-level example of how you might interact with the **TeamPoints** and **TeamPointsFactory** contracts:
+1. **Deploy the Factory**
 
-1. **Deploy the Factory**  
    ```solidity
    // Deploy the factory
    TeamPointsFactory factory = new TeamPointsFactory();
    ```
 
-2. **Use the Factory to Create a TeamPoints Contract**  
+2. **Create a TeamPoints Contract**
+
    ```solidity
    // Create a new TeamPoints contract with the given settings
    address newTeamPointsAddr = factory.createTeamPoints(
@@ -261,7 +304,8 @@ Below is a high-level example of how you might interact with the **TeamPoints** 
    );
    ```
 
-3. **Interact with the Deployed TeamPoints**  
+3. **Interact with the Deployed TeamPoints**
+
    ```solidity
    TeamPoints teamPoints = TeamPoints(newTeamPointsAddr);
 
@@ -274,9 +318,10 @@ Below is a high-level example of how you might interact with the **TeamPoints** 
    }
    ```
 
-4. **Update Contract Settings**  
+4. **Update Contract Settings**
+
    ```solidity
-   // As admin, you can update the contract’s settings
+   // As admin, you can update contract settings
    teamPoints.updateSettings(
        true,   // allow transfers
        true,   // allow outside transfers
@@ -284,16 +329,28 @@ Below is a high-level example of how you might interact with the **TeamPoints** 
    );
    ```
 
-5. **Add or Remove Admins**  
+5. **Add or Remove Admins**
+
    ```solidity
-   // Mint some tokens to user (newAdminCandidate)
+   // Mint tokens to a user
    teamPoints.mint(newAdminCandidate, 100, 0);
 
-   // Add them as an admin
+   // Grant them admin privileges
    teamPoints.addAdmin(newAdminCandidate);
 
    // Remove an admin
    teamPoints.removeAdmin(currentAdmin);
+   ```
+
+6. **Use Batch Mint**  
+   If you’ve implemented `batchMint()`, you can mint to multiple addresses in one transaction:
+   ```solidity
+   // Mint to multiple addresses in one call
+   teamPoints.batchMint(
+       [user1, user2],
+       [10, 20],  // materialContributions
+       [50, 100]  // timeContributions
+   );
    ```
 
 ---
@@ -307,22 +364,29 @@ A suite of tests (written in JavaScript/TypeScript) is included to demonstrate:
 - How to test minting, transfers, time-weight logic, and role-based restrictions.
 
 **Key test scenarios include**:
+
 - Deploying a **TeamPoints** instance and verifying initial settings.
-- Minting tokens to users and verifying the correct balance changes.
+- Minting tokens to users and verifying correct balances.
 - Testing the `timeWeight` calculation over multiple 6-month periods.
 - Ensuring transfers respect `isTransferable` and `isOutsideTransferAllowed`.
 - Adding/removing admins, ensuring the last admin cannot be removed.
+- Testing `batchMint()` functionality if you add it to your contract.
 
 You can run the tests by:
+
 ```bash
 npx hardhat test
 ```
 
+---
 
 ## Deployed Contracts
-Network: Arbitrum Sepolia
-TeamPointsFactory deployed to: 0x5FbDB2315678afecb367f032d93F642f64180aa3
+
+- **Network**: Arbitrum Sepolia
+- **TeamPointsFactory** deployed to: `0x5FbDB2315678afecb367f032d93F642f64180aa3`
+
 ---
+
 ## License
 
 Both **TeamPoints** and **TeamPointsFactory** are licensed under the MIT License. See the [LICENSE](https://opensource.org/licenses/MIT) file for more details.
