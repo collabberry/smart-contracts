@@ -318,8 +318,12 @@ You can run the tests by:
 npx hardhat test
 ```
 
----
 
+## Deployed Contracts
+Network: Arbitrum Sepolia
+TeamPointsFactory deployed to: 0x5FbDB2315678afecb367f032d93F642f64180aa3
+
+---
 ## License
 
 Both **TeamPoints** and **TeamPointsFactory** are licensed under the MIT License. See the [LICENSE](https://opensource.org/licenses/MIT) file for more details.
