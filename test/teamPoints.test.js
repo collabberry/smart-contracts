@@ -287,5 +287,112 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
         expect(await teamPoints.balanceOf(addr1.address)).to.equal(1300);
       });
     });
+
+    describe("TeamPoints - batchMint Tests", function () {
+      let owner, addr1, addr2, addr3;
+      let teamPoints;
+
+      beforeEach(async function () {
+        [owner, addr1, addr2, addr3] = await ethers.getSigners();
+
+        // Deploy the factory
+        const TeamPointsFactory = await ethers.getContractFactory("TeamPointsFactory");
+        const teamPointsFactory = await TeamPointsFactory.deploy();
+        await teamPointsFactory.deployed();
+
+        // Create a new TeamPoints instance via the factory
+        const tx = await teamPointsFactory.createTeamPoints(
+          false, // isTransferable
+          false, // isOutsideTransferAllowed
+          100,   // materialContributionWeight
+          "Batch Test Token",
+          "BTT"
+        );
+        const receipt = await tx.wait();
+        const event = receipt.events.find((e) => e.event === "TeamPointsCreated");
+        const contractAddress = event.args.contractAddress;
+
+        // Attach to the newly created contract
+        const TeamPoints = await ethers.getContractFactory("TeamPoints");
+        teamPoints = await TeamPoints.attach(contractAddress);
+      });
+
+      describe("batchMint()", function () {
+        it("Should revert if input arrays have different lengths", async function () {
+          const recipients = [addr1.address, addr2.address];
+          const matContribs = [100]; // shorter
+          const timeContribs = [50, 50];
+
+          await expect(
+            teamPoints.batchMint(recipients, matContribs, timeContribs)
+          ).to.be.revertedWith("Input array lengths mismatch");
+        });
+
+        it("Should revert if called by a non-admin", async function () {
+          // Non-admin tries to call batchMint
+          await expect(
+            teamPoints.connect(addr1).batchMint(
+              [addr2.address],
+              [100],
+              [50]
+            )
+          ).to.be.revertedWith("AccessControlUnauthorizedAccount");
+        });
+
+        it("Should batch mint correctly for multiple recipients in one transaction", async function () {
+          // Recipients: addr1, addr2
+          const recipients = [addr1.address, addr2.address];
+          // Suppose we have these material/time contributions:
+          // material: [10, 20], time: [5, 10]
+          //   => mintedAmount for each user = (material * 100) + ((time * timeWeight) / 1000).
+          //   => timeWeight for new recipients is 2000 by default.
+
+          const matContribs = [10, 20];
+          const timeContribs = [5, 10];
+
+          // Admin calls batchMint
+          await teamPoints.batchMint(recipients, matContribs, timeContribs);
+
+          // Calculate expected amounts
+          // For addr1: 
+          //   timeWeight = 2000
+          //   minted = (10 * 100) + ((5 * 2000) / 1000) = 1000 + 10 = 1010
+          // For addr2:
+          //   minted = (20 * 100) + ((10 * 2000) / 1000) = 2000 + 20 = 2020
+
+          expect(await teamPoints.balanceOf(addr1.address)).to.equal(1010);
+          expect(await teamPoints.balanceOf(addr2.address)).to.equal(2020);
+        });
+
+        it("Should set firstMintTime for each new address in the batch", async function () {
+          const recipients = [addr1.address, addr2.address];
+          const matContribs = [10, 20];
+          const timeContribs = [5, 10];
+
+          await teamPoints.batchMint(recipients, matContribs, timeContribs);
+
+          // After batchMint, check that firstMintTime was recorded
+          const firstMint1 = await teamPoints.callStatic.getTimeWeight(addr1.address);
+          const firstMint2 = await teamPoints.callStatic.getTimeWeight(addr2.address);
+
+          // Both should use the default 2000 (since they're new recipients)
+          expect(firstMint1).to.equal(2000);
+          expect(firstMint2).to.equal(2000);
+        });
+
+        it("Should accumulate additional tokens for recipients if called multiple times", async function () {
+          // First batch mint
+          await teamPoints.batchMint([addr1.address], [10], [0]);
+          // minted = 10*100 + 0 = 1000
+
+          // Second batch mint, same address but different material/time
+          // Let's do: material=5, time=10 => minted = (5*100) + (10*2000/1000)= 500 + 20=520
+          // So total final = 1000 + 520 = 1520
+          await teamPoints.batchMint([addr1.address], [5], [10]);
+
+          expect(await teamPoints.balanceOf(addr1.address)).to.equal(1520);
+        });
+      });
+    });
   });
 });

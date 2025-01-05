@@ -108,6 +108,39 @@ contract TeamPoints is ERC20, AccessControl {
         }
     }
 
+    function batchMint(
+        address[] calldata recipients,
+        uint256[] calldata materialContributions,
+        uint256[] calldata timeContributions
+    ) external onlyRole(ADMIN_ROLE) {
+        require(
+            recipients.length == materialContributions.length &&
+                recipients.length == timeContributions.length,
+            "Input array lengths mismatch"
+        );
+
+        for (uint256 i = 0; i < recipients.length; i++) {
+            // If first time minting for this recipient, set their firstMintTime
+            if (firstMintTime[recipients[i]] == 0) {
+                firstMintTime[recipients[i]] = block.timestamp;
+            }
+
+            uint256 timeWeight = getTimeWeight(recipients[i]);
+
+            // Same mint calculation as in your existing mint function
+            uint256 totalAmount = (materialContributions[i] *
+                materialContributionWeight) +
+                ((timeContributions[i] * timeWeight) / 1000);
+
+            _mint(recipients[i], totalAmount);
+
+            // Mark that this recipient has received tokens
+            if (!hasReceivedTokens[recipients[i]]) {
+                hasReceivedTokens[recipients[i]] = true;
+            }
+        }
+    }
+
     /**
      * @dev Admin can update settings controlling transfer behavior and materialWeight.
      */

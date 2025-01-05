@@ -322,7 +322,6 @@ npx hardhat test
 ## Deployed Contracts
 Network: Arbitrum Sepolia
 TeamPointsFactory deployed to: 0x5FbDB2315678afecb367f032d93F642f64180aa3
-
 ---
 ## License
 
