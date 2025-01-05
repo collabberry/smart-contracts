@@ -13,15 +13,12 @@ async function main() {
   // manually to make sure everything is compiled
   // await hre.run('compile');
 
-  
 
   // We get the contract to deploy
-  const owner = '0x8EB8E8A05A1E2945d0b1cb5418bFD9adC1c1D27E';
-  const metadata = 'ipfs://bafybeiemu644jivrqf57hkfrfumarxiie6xknhoupk56xof2nvj2on7l3u/testOrg.metadata.json'
-  const Organization = await ethers.getContractFactory("Organization");
-  const organization = await Organization.deploy(owner, metadata);
-  await organization.deployed();
-  console.log("Organization deployed to:", organization.address);
+  const TeamPointsFactory = await ethers.getContractFactory("TeamPointsFactory");
+  const teamPointsFactory = await TeamPointsFactory.deploy();
+  await teamPointsFactory.deployed();
+  console.log("TeamPointsFactory deployed to:", teamPointsFactory.address);
 
 }
 
