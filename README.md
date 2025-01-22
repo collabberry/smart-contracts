@@ -390,6 +390,7 @@ npx hardhat test
 - **Network**: Arbitrum One
 - **Environment used**: https://beta.collabberry.xyz (Beta)
 - **TeamPointsFactory** deployed to: `0x69a99AeAc1F2410e82A84E08268b336116Ab3B5a`
+- **TeamPointsFactory v2** deployed to: `0x4A30F2e53e162eC6cc9794D6C68BFAE174bB4872`
 
 ---
 

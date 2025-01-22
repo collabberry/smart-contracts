@@ -5,10 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract TeamPoints is ERC20, AccessControl {
-    /**
-     * @dev We define a constant for the admin role. By default, AccessControl
-     * gives us `DEFAULT_ADMIN_ROLE`, but you can define a custom role name if you prefer.
-     */
+
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     bool public isTransferable;
@@ -28,6 +25,7 @@ contract TeamPoints is ERC20, AccessControl {
     );
     event AdminAdded(address newAdmin);
     event AdminRemoved(address removedAdmin);
+    event ManualAllocationCompleted();
 
     constructor(
         address initialOwner,
@@ -138,6 +136,26 @@ contract TeamPoints is ERC20, AccessControl {
                 hasReceivedTokens[recipients[i]] = true;
             }
         }
+    }
+
+    function manualAllocation(
+        address[] calldata recipients,
+        uint[] calldata amounts
+    ) external onlyRole(ADMIN_ROLE) {
+        require(
+            recipients.length == amounts.length,
+            "Input array lengths mismatch"
+        );
+
+        for (uint256 i = 0; i < recipients.length; i++) {
+            _mint(recipients[i], amounts[i]);
+
+            if (!hasReceivedTokens[recipients[i]]) {
+                hasReceivedTokens[recipients[i]] = true;
+            }
+        }
+
+        emit ManualAllocationCompleted();
     }
 
     /**
