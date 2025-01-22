@@ -165,7 +165,6 @@ contract TeamPoints is ERC20, AccessControl {
 
     /**
      * @dev Add a new admin. We enforce that the new admin must already be a token holder
-     * if you want that same rule from your old contract. Remove if not needed.
      */
     function addAdmin(address newAdmin) external onlyRole(ADMIN_ROLE) {
         require(
