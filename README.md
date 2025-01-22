@@ -383,7 +383,13 @@ npx hardhat test
 ## Deployed Contracts
 
 - **Network**: Arbitrum Sepolia
+- **Environment used**: https://app.collabberry.xyz (Dev)
 - **TeamPointsFactory** deployed to: `0x0e414560fdEeC039c4636b9392176ddc938b182D`
+
+
+- **Network**: Arbitrum One
+- **Environment used**: https://beta.collabberry.xyz (Beta)
+- **TeamPointsFactory** deployed to: `0x69a99AeAc1F2410e82A84E08268b336116Ab3B5a`
 
 ---
 
