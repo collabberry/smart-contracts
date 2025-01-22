@@ -392,5 +392,82 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
         });
       });
     });
+
+    describe("manualAllocation()", function () {
+      let owner, addr1, addr2, addr3;
+      let teamPoints;
+    
+      beforeEach(async function () {
+        [owner, addr1, addr2, addr3] = await ethers.getSigners();
+    
+        // Deploy the factory
+        const TeamPointsFactory = await ethers.getContractFactory("TeamPointsFactory");
+        const teamPointsFactory = await TeamPointsFactory.deploy();
+        await teamPointsFactory.deployed();
+    
+        // Create a new TeamPoints instance via the factory
+        const tx = await teamPointsFactory.deployTeamPoints(
+          "Allocation Test Token",
+          "ATT"
+        );
+    
+        const receipt = await tx.wait();
+        const event = receipt.events.find((e) => e.event === "TeamPointsCreated");
+        const contractAddress = event.args.contractAddress;
+    
+        // Attach to the newly created contract
+        const TeamPoints = await ethers.getContractFactory("TeamPoints");
+        teamPoints = await TeamPoints.attach(contractAddress);
+      });
+    
+      it("Should correctly allocate tokens during the manualAllocation", async function () {
+        const recipients = [addr1.address, addr2.address, addr3.address];
+        const amounts = [100, 200, 300];
+    
+        // Perform the initial allocation
+        await teamPoints.manualAllocation(recipients, amounts);
+    
+        // Check balances
+        expect(await teamPoints.balanceOf(addr1.address)).to.equal(100);
+        expect(await teamPoints.balanceOf(addr2.address)).to.equal(200);
+        expect(await teamPoints.balanceOf(addr3.address)).to.equal(300);
+    
+        // Check total supply
+        expect(await teamPoints.totalSupply()).to.equal(600);
+      });
+    
+      
+      it("Should revert if input arrays have mismatched lengths", async function () {
+        const recipients = [addr1.address, addr2.address];
+        const amounts = [100]; // Mismatched length
+    
+        await expect(
+          teamPoints.manualAllocation(recipients, amounts)
+        ).to.be.revertedWith("Input array lengths mismatch");
+      });
+    
+      it("Should mark recipients as token holders after allocation", async function () {
+        const recipients = [addr1.address, addr2.address];
+        const amounts = [100, 200];
+    
+        // Perform the allocation
+        await teamPoints.manualAllocation(recipients, amounts);
+        await teamPoints.manualAllocation(recipients, amounts);
+    
+        // Verify token holder status
+        expect(await teamPoints.balanceOf(addr1.address)).to.eq(200);
+        expect(await teamPoints.balanceOf(addr2.address)).to.eq(400);
+      });
+    
+      it("Should emit ManualAllocationCompleted event", async function () {
+        const recipients = [addr1.address, addr2.address];
+        const amounts = [100, 200];
+    
+        // Perform the allocation and listen for the event
+        await expect(teamPoints.manualAllocation(recipients, amounts))
+          .to.emit(teamPoints, "ManualAllocationCompleted");
+      });
+    });
+    
   });
 });
