@@ -444,37 +444,37 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
     describe("manualAllocation()", function () {
       let owner, addr1, addr2, addr3;
       let teamPoints;
-
+    
       beforeEach(async function () {
         [owner, addr1, addr2, addr3] = await ethers.getSigners();
-
+    
         // Deploy the factory
         const TeamPointsFactory = await ethers.getContractFactory("TeamPointsFactory");
         const teamPointsFactory = await TeamPointsFactory.deploy();
         await teamPointsFactory.deployed();
-
+    
         // Create a new TeamPoints instance via the factory
         const tx = await teamPointsFactory.deployTeamPoints(
           "Allocation Test Token",
           "ATT"
         );
-
+    
         const receipt = await tx.wait();
         const event = receipt.events.find((e) => e.event === "TeamPointsCreated");
         const contractAddress = event.args.contractAddress;
-
+    
         // Attach to the newly created contract
         const TeamPoints = await ethers.getContractFactory("TeamPoints");
         teamPoints = await TeamPoints.attach(contractAddress);
       });
-
+    
       it("Should correctly allocate tokens during the manualAllocation", async function () {
         const recipients = [addr1.address, addr2.address, addr3.address];
         const amounts = [100, 200, 300];
-
+    
         // Perform the initial allocation
         await teamPoints.manualAllocation(recipients, amounts);
-
+    
         // Check balances
         expect(await teamPoints.balanceOf(addr1.address)).to.equal(100);
         expect(await teamPoints.balanceOf(addr2.address)).to.equal(200);
@@ -516,6 +516,5 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
           .to.emit(teamPoints, "ManualAllocationCompleted");
       });
     });
-
   });
 });
