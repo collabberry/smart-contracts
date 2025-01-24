@@ -131,10 +131,13 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
       ).to.be.revertedWith("Transfers are disabled");
 
       // Now let's enable transfers
-      await teamPoints.updateSettings(
+      await teamPoints.updateConfig(
         true, // _isTransferable
         false, // _isOutsideTransferAllowed
-        4 // _materialWeight
+        4, // _materialWeight
+        2000,
+        true,
+        4000
       );
 
       // Transfer should succeed now that isTransferable = true
@@ -146,7 +149,14 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
 
     it("Should prevent transfers to new addresses if isOutsideTransferAllowed is false", async function () {
       // isTransferable = false by default, so let's allow transfers
-      await teamPoints.updateSettings(true, false, 4000);
+      await teamPoints.updateConfig(
+        true, 
+        false, 
+        4000,
+        2000,
+        true,
+        4000
+      );
 
       // Mint some tokens to addr1
       // minted = 0 + (100 * 2000 / 1000) = 200
@@ -176,7 +186,14 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
       expect(await teamPoints.materialContributionWeight()).to.equal(4000);
 
       // Update
-      await teamPoints.updateSettings(true, true, 500);
+      await teamPoints.updateConfig(
+        true, 
+        true, 
+        500,
+        2000,
+        true,
+        4000
+      );
       expect(await teamPoints.isTransferable()).to.equal(true);
       expect(await teamPoints.isOutsideTransferAllowed()).to.equal(true);
       expect(await teamPoints.materialContributionWeight()).to.equal(500);
@@ -211,9 +228,14 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
     describe("Material & Time Contribution Calculations", function () {
       it("Should mint the correct amount with zero time contribution (timeWeight = 2000 by default)", async function () {
 
-        // set materialContributionWeight = 10
-        await teamPoints.updateSettings(true, true, 100000);
-
+        await teamPoints.updateConfig(
+          true, 
+          true, 
+          100000,
+          2000,
+          true,
+          4000
+        );
         // For a new user, timeWeight = 2000
         // minted = (materialContribution * 100) + (timeContribution * 2000 / 1000)
 
@@ -226,14 +248,28 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
       it("Should mint the correct amount with both material and time contributions for a new user", async function () {
         // Example: mint(addr1, 10, 50) => new user => timeWeight=2000
         // minted = (10 * 100) + ((50 * 2000) / 1000) = 1000 + 100 = 1100
-        await teamPoints.updateSettings(true, true, 100000);
+        await teamPoints.updateConfig(
+          true, 
+          true, 
+          100000,
+          2000,
+          true,
+          4000
+        );
 
         await teamPoints.mint(addr1.address, 10, 50);
         expect(await teamPoints.balanceOf(addr1.address)).to.equal(1100);
       });
 
       it("Should increase timeWeight after 6 months and mint accordingly", async function () {
-        await teamPoints.updateSettings(true, true, 100000);
+        await teamPoints.updateConfig(
+          true, 
+          true, 
+          100000,
+          2000,
+          true,
+          4000
+        );
 
         // 1) Mint initially to set firstMintTime
         // minted = (0 * 100) + ((50 * 2000) / 1000) = 100
@@ -256,8 +292,14 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
       });
 
       it("Should cap timeWeight at 4000 after enough time passes", async function () {
-        await teamPoints.updateSettings(true, true, 100000);
-
+        await teamPoints.updateConfig(
+          true, 
+          true, 
+          100000,
+          2000,
+          true,
+          4000
+        );
         // For the first mint
         await teamPoints.mint(addr1.address, 1, 0);
         // minted = (1*100) + 0 = 100
@@ -311,8 +353,14 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
         // Attach to the newly created contract
         const TeamPoints = await ethers.getContractFactory("TeamPoints");
         teamPoints = await TeamPoints.attach(contractAddress);
-        await teamPoints.updateSettings(true, true, 100000);
-
+        await teamPoints.updateConfig(
+          true, 
+          true, 
+          100000,
+          2000,
+          true,
+          4000
+        );
       });
 
       describe("batchMint()", function () {
@@ -396,78 +444,78 @@ describe("TeamPointsFactory and TeamPoints Tests", function () {
     describe("manualAllocation()", function () {
       let owner, addr1, addr2, addr3;
       let teamPoints;
-    
+
       beforeEach(async function () {
         [owner, addr1, addr2, addr3] = await ethers.getSigners();
-    
+
         // Deploy the factory
         const TeamPointsFactory = await ethers.getContractFactory("TeamPointsFactory");
         const teamPointsFactory = await TeamPointsFactory.deploy();
         await teamPointsFactory.deployed();
-    
+
         // Create a new TeamPoints instance via the factory
         const tx = await teamPointsFactory.deployTeamPoints(
           "Allocation Test Token",
           "ATT"
         );
-    
+
         const receipt = await tx.wait();
         const event = receipt.events.find((e) => e.event === "TeamPointsCreated");
         const contractAddress = event.args.contractAddress;
-    
+
         // Attach to the newly created contract
         const TeamPoints = await ethers.getContractFactory("TeamPoints");
         teamPoints = await TeamPoints.attach(contractAddress);
       });
-    
+
       it("Should correctly allocate tokens during the manualAllocation", async function () {
         const recipients = [addr1.address, addr2.address, addr3.address];
         const amounts = [100, 200, 300];
-    
+
         // Perform the initial allocation
         await teamPoints.manualAllocation(recipients, amounts);
-    
+
         // Check balances
         expect(await teamPoints.balanceOf(addr1.address)).to.equal(100);
         expect(await teamPoints.balanceOf(addr2.address)).to.equal(200);
         expect(await teamPoints.balanceOf(addr3.address)).to.equal(300);
-    
+
         // Check total supply
         expect(await teamPoints.totalSupply()).to.equal(600);
       });
-    
-      
+
+
       it("Should revert if input arrays have mismatched lengths", async function () {
         const recipients = [addr1.address, addr2.address];
         const amounts = [100]; // Mismatched length
-    
+
         await expect(
           teamPoints.manualAllocation(recipients, amounts)
         ).to.be.revertedWith("Input array lengths mismatch");
       });
-    
+
       it("Should mark recipients as token holders after allocation", async function () {
         const recipients = [addr1.address, addr2.address];
         const amounts = [100, 200];
-    
+
         // Perform the allocation
         await teamPoints.manualAllocation(recipients, amounts);
         await teamPoints.manualAllocation(recipients, amounts);
-    
+
         // Verify token holder status
         expect(await teamPoints.balanceOf(addr1.address)).to.eq(200);
         expect(await teamPoints.balanceOf(addr2.address)).to.eq(400);
       });
-    
+
       it("Should emit ManualAllocationCompleted event", async function () {
         const recipients = [addr1.address, addr2.address];
         const amounts = [100, 200];
-    
+
         // Perform the allocation and listen for the event
         await expect(teamPoints.manualAllocation(recipients, amounts))
           .to.emit(teamPoints, "ManualAllocationCompleted");
       });
     });
-    
+
   });
 });

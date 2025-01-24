@@ -38,6 +38,9 @@ contract TeamPointsFactory {
             false,
             false,
             4000,
+            2000,
+            false,
+            4000,
             name,
             symbol
         );

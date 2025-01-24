@@ -77,7 +77,7 @@ The **TeamPointsFactory** simplifies deploying new **TeamPoints** contracts by p
   Allows the holder to:
   - Mint new tokens via `mint` 
   - Batch mint tokens via `batchMint`
-  - Update critical settings via `updateSettings`.
+  - Update critical settings via `updateConfig`.
   - Add or remove admins.
 
 The contract also ensures there is never a scenario where the last admin is removed (which would lock the contract).
@@ -165,7 +165,7 @@ _mint(to, totalAmount);
 - If `firstMintTime[to]` is `0`, it is set to the current block timestamp.
 - Requires `ADMIN_ROLE`.
 
-#### `updateSettings(bool _isTransferable, bool _isOutsideTransferAllowed, uint256 _materialWeight) external onlyRole(ADMIN_ROLE)`
+#### `updateConfig(bool _isTransferable, bool _isOutsideTransferAllowed, uint256 _materialWeight) external onlyRole(ADMIN_ROLE)`
 
 Updates the contract’s transfer-related settings (`isTransferable`, `isOutsideTransferAllowed`) and the `materialContributionWeight`.
 
@@ -322,7 +322,7 @@ Returns an array of all deployed **TeamPoints** contract addresses.
 
    ```solidity
    // As admin, you can update contract settings
-   teamPoints.updateSettings(
+   teamPoints.updateConfig(
        true,   // allow transfers
        true,   // allow outside transfers
        200     // new material contribution weight
