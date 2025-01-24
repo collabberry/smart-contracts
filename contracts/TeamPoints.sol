@@ -5,12 +5,14 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 
 contract TeamPoints is ERC20, AccessControl {
-
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     bool public isTransferable;
     bool public isOutsideTransferAllowed;
     uint256 public materialContributionWeight;
+    uint256 public baseTimeWeight;
+    bool public enableTimeScaling;
+    uint256 public maxTimeScaling;
 
     // Keep track of how many accounts have the ADMIN_ROLE
     uint256 private adminCount;
@@ -18,10 +20,13 @@ contract TeamPoints is ERC20, AccessControl {
     mapping(address => bool) private hasReceivedTokens;
     mapping(address => uint256) private firstMintTime;
 
-    event SettingsUpdated(
+    event ConfigUpdated(
         bool isTransferable,
         bool isOutsideTransferAllowed,
-        uint256 materialWeight
+        uint256 materialWeight,
+        uint256 baseTimeWeight,
+        bool enableTimeScaling,
+        uint256 maxTimeScaling
     );
     event AdminAdded(address newAdmin);
     event AdminRemoved(address removedAdmin);
@@ -32,6 +37,9 @@ contract TeamPoints is ERC20, AccessControl {
         bool _isTransferable,
         bool _isOutsideTransferAllowed,
         uint256 _materialWeight,
+        uint256 _timeWeight,
+        bool _timeWeightIncrease,
+        uint256 _maxTimeScaling,
         string memory name,
         string memory symbol
     ) ERC20(name, symbol) {
@@ -45,6 +53,9 @@ contract TeamPoints is ERC20, AccessControl {
         isTransferable = _isTransferable;
         isOutsideTransferAllowed = _isOutsideTransferAllowed;
         materialContributionWeight = _materialWeight;
+        baseTimeWeight = _timeWeight;
+        enableTimeScaling = _timeWeightIncrease;
+        maxTimeScaling = _maxTimeScaling;
     }
 
     // ------------------------------------------------------------------------
@@ -52,13 +63,15 @@ contract TeamPoints is ERC20, AccessControl {
     // ------------------------------------------------------------------------
 
     function getTimeWeight(address user) public view returns (uint256) {
-        if (firstMintTime[user] == 0) return 2000;
+        if (firstMintTime[user] == 0) return baseTimeWeight;
+
+        if (!enableTimeScaling) return baseTimeWeight;
 
         uint256 sixMonthPeriods = (block.timestamp - firstMintTime[user]) /
             (180 days);
-        uint256 timeWeight = 2000 + (sixMonthPeriods * 125);
+        uint256 timeWeight = baseTimeWeight + (sixMonthPeriods * 125);
 
-        return timeWeight > 4000 ? 4000 : timeWeight;
+        return timeWeight > maxTimeScaling ? maxTimeScaling : timeWeight;
     }
 
     /**
@@ -95,8 +108,9 @@ contract TeamPoints is ERC20, AccessControl {
         }
 
         uint256 timeWeight = getTimeWeight(to);
-        uint256 totalAmount = ((materialContribution * materialContributionWeight) /
-            1000) + ((timeContribution * timeWeight) / 1000);
+        uint256 totalAmount = ((materialContribution *
+            materialContributionWeight) / 1000) +
+            ((timeContribution * timeWeight) / 1000);
 
         _mint(to, totalAmount);
 
@@ -161,19 +175,28 @@ contract TeamPoints is ERC20, AccessControl {
     /**
      * @dev Admin can update settings controlling transfer behavior and materialWeight.
      */
-    function updateSettings(
+    function updateConfig(
         bool _isTransferable,
         bool _isOutsideTransferAllowed,
-        uint256 _materialWeight
+        uint256 _materialWeight,
+        uint256 _baseTimeWeight,
+        bool _enableTimeScaling,
+        uint256 _maxTimeScaling
     ) external onlyRole(ADMIN_ROLE) {
         isTransferable = _isTransferable;
         isOutsideTransferAllowed = _isOutsideTransferAllowed;
         materialContributionWeight = _materialWeight;
+        baseTimeWeight = _baseTimeWeight;
+        enableTimeScaling = _enableTimeScaling;
+        maxTimeScaling = _maxTimeScaling;
 
-        emit SettingsUpdated(
+        emit ConfigUpdated(
             _isTransferable,
             _isOutsideTransferAllowed,
-            _materialWeight
+            _materialWeight,
+            _baseTimeWeight,
+            _enableTimeScaling,
+            _maxTimeScaling
         );
     }
 
